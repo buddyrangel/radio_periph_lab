@@ -119,6 +119,14 @@ architecture arch_imp of full_radio_v1_0_S00_AXI is
 	signal byte_index	: integer;
 	signal aw_en	: std_logic;
 
+	--//////////////////////////////////////////////////////////////
+	-- Lab 10 Modification: DDS Reset Control
+	-- Purpose: Provide an active-low DDS reset signal controlled
+	--          by bit 0 of AXI-Lite Register 2.
+	--//////////////////////////////////////////////////////////////
+
+	signal dds_aresetn : std_logic;
+
 COMPONENT dds_compiler_0
   PORT (
     aclk : IN STD_LOGIC;
@@ -132,6 +140,14 @@ COMPONENT dds_compiler_0
 
 begin
 	-- I/O Connections assignments
+
+	--//////////////////////////////////////////////////////////////
+	-- Lab 10 Modification: DDS Reset Control Logic
+	-- Purpose: Allow bit 0 of AXI-Lite Register 2 to reset the
+	--          DDS while preserving the system's active-low reset.
+	--//////////////////////////////////////////////////////////////
+
+	dds_aresetn <= S_AXI_ARESETN and not slv_reg2(0);
 
 	S_AXI_AWREADY	<= axi_awready;
 	S_AXI_WREADY	<= axi_wready;
@@ -229,7 +245,16 @@ begin
 	      slv_reg0 <= (others => '0');
 	      slv_reg1 <= (others => '0');
 	      slv_reg2 <= (others => '0');
-	      slv_reg3 <= (others => '0');
+
+	    --//////////////////////////////////////////////////////////////
+	    -- Lab 10 Modification: Register 3 - Timer Reset
+	    -- Purpose: Remove Register 3 from the original reset logic.
+	    --          The dedicated timer process will handle its reset.
+	    --//////////////////////////////////////////////////////////////
+
+    	    -- Original professor-provided implementation:
+	    -- slv_reg3 <= (others => '0');
+
 	    else
 	      loc_addr := axi_awaddr(ADDR_LSB + OPT_MEM_ADDR_BITS downto ADDR_LSB);
 	      if (slv_reg_wren = '1') then
@@ -258,24 +283,60 @@ begin
 	                slv_reg2(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
 	              end if;
 	            end loop;
-	          when b"11" =>
-	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
-	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
+	         when b"11" =>
+		    --//////////////////////////////////////////////////////////////
+		    -- Lab 10 Modification: Register 3 - Read-Only Timer
+		    -- Purpose: Disable AXI-Lite writes to Register 3 so it can
+		    --          operate as a free-running 32-bit timer.
+		    --//////////////////////////////////////////////////////////////
+		
+	          --  for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
+	          --    if ( S_AXI_WSTRB(byte_index) = '1' ) then
 	                -- Respective byte enables are asserted as per write strobes                   
 	                -- slave registor 3
-	                slv_reg3(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
-	              end if;
-	            end loop;
+	           --     slv_reg3(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
+	           --   end if;
+	           -- end loop;
+     		   -- Register 3 is read-only; ignore processor writes. 
+		    null;
 	          when others =>
 	            slv_reg0 <= slv_reg0;
 	            slv_reg1 <= slv_reg1;
 	            slv_reg2 <= slv_reg2;
-	            slv_reg3 <= slv_reg3;
+
+	           -- Lab 10: Removed slv_reg3 self-assignment.
+    		   -- Register 3 will be driven exclusively by the timer process.
+   		   -- Original: slv_reg3 <= slv_reg3;
+
 	        end case;
 	      end if;
 	    end if;
 	  end if;                   
 	end process; 
+
+--//////////////////////////////////////////////////////////////
+-- Lab 10 Modification: Register 3 - Free-Running Timer
+-- Purpose: Implement a 32-bit counter that increments on
+--          every AXI clock cycle and resets to zero when
+--          the AXI active-low reset is asserted.
+--//////////////////////////////////////////////////////////////
+
+process (S_AXI_ACLK)
+begin
+    if rising_edge(S_AXI_ACLK) then
+
+        if S_AXI_ARESETN = '0' then
+            -- Reset timer to zero.
+            slv_reg3 <= (others => '0');
+
+        else
+            -- Increment timer once per AXI clock cycle.
+            slv_reg3 <= std_logic_vector(unsigned(slv_reg3) + 1);
+
+        end if;
+
+    end if;
+end process;
 
 	-- Implement write response logic generation
 	-- The write response and response valid signals are asserted by the slave 
@@ -367,7 +428,17 @@ begin
 	      when b"00" =>
 	        reg_data_out <= slv_reg0;
 	      when b"01" =>
-	        reg_data_out <= x"DEADBEEF";
+
+		    --//////////////////////////////////////////////////////////////
+		    -- Lab 10 Modification: Tuner DDS Phase Increment Readback
+		    -- Purpose: Return the value stored in Register 1 instead
+		    --          of the original DEADBEEF placeholder.
+   		    --//////////////////////////////////////////////////////////////
+		-- Original professor-provided implementation:
+	        -- reg_data_out <= x"DEADBEEF"; ...lol deadbeef...
+
+		-- Return the stored tuner DDS phase increment.
+		reg_data_out <= slv_reg1;
 	      when b"10" =>
 	        reg_data_out <= slv_reg2;
 	      when b"11" =>
@@ -398,10 +469,21 @@ begin
 
 	-- Add user logic here
 
+--//////////////////////////////////////////////////////////////
+-- Lab 10 Modification: DDS Compiler Reset Integration
+-- Purpose: Replace the hardwired reset with the AXI-Lite
+--          software-controlled reset signal from Register 2.
+--//////////////////////////////////////////////////////////////
+
 your_instance_name : dds_compiler_0
   PORT MAP (
     aclk => s_axi_aclk,
-    aresetn => '1',
+
+    -- Original professor-provided implementation:
+    -- aresetn => '1',
+    -- Connect DDS reset to Register 2 control logic.
+    aresetn => dds_aresetn,
+    
     s_axis_phase_tvalid => '1',
     s_axis_phase_tdata => slv_reg0,
     m_axis_data_tvalid => m_axis_tvalid,
