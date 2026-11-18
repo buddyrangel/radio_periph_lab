@@ -21,17 +21,32 @@ volatile unsigned int * get_a_pointer(unsigned int phys_addr)
 	return (radio_base);
 }
 
+/*//////////////////////////////////////////////////////////////
+  Lab 10 Modification: Tuner DDS Phase Increment
+  Purpose: Match the 31-bit tuner DDS used in the Lab 10
+           hardware design and its verified tuning direction.
+//////////////////////////////////////////////////////////////*/
 
 void radioTuner_tuneRadio(volatile unsigned int *ptrToRadio, float tune_frequency)
 {
-	float pinc = (-1.0*tune_frequency)*(float)(1<<27)/125.0e6;
-	*(ptrToRadio+RADIO_TUNER_TUNER_PINC_OFFSET)=(int)pinc;
+	// Professor's original 27-bit tuner calculation //
+	// float pinc = (-1.0*tune_frequency)*(float)(1<<27)/125.0e6;
+	// *(ptrToRadio+RADIO_TUNER_TUNER_PINC_OFFSET)=(int)pinc;
+
+	// Calculate the phase increment for the 31-bit tuner DDS //
+	double pinc = (double)tune_frequency * 2147483648.0 / 125000000.0;
+
+	// Program the tuner DDS through AXI-Lite Register 1 //
+	*(ptrToRadio + RADIO_TUNER_TUNER_PINC_OFFSET) = (unsigned int)pinc;
 }
+
 
 void radioTuner_setAdcFreq(volatile unsigned int* ptrToRadio, float freq)
 {
-	float pinc = freq*(float)(1<<27)/125.0e6;
-	*(ptrToRadio+RADIO_TUNER_FAKE_ADC_PINC_OFFSET) = (int)pinc;
+    
+    float pinc = freq*(float)(1<<27)/125.0e6;
+    *(ptrToRadio+RADIO_TUNER_FAKE_ADC_PINC_OFFSET) = (int)pinc;
+
 }
 
 void play_tune(volatile unsigned int *ptrToRadio, float base_frequency)
@@ -58,13 +73,43 @@ void print_benchmark(volatile unsigned int *periph_base)
     for (int i=0;i<2048;i++)
         stop_time = *(periph_base+RADIO_TUNER_TIMER_REG_OFFSET);
     printf("Elapsed time in clocks = %u\n",stop_time-start_time);
-    float throughput=0; 
+
+    /*//////////////////////////////////////////////////////////////
+      Lab 10 Modification: AXI-Lite Read Throughput Benchmark
+      Purpose: Calculate the actual data throughput using
+               2048 timer reads and the 125 MHz AXI clock.
+    //////////////////////////////////////////////////////////////*/
+
+    // float throughput=0; 
     // please insert your code here for calculate the actual throughput in Mbytes/second
     // how much data was transferred? How long did it take?
-    unsigned int bytes_transferred = 0; // change obviously
-    float time_spent = 1; // change obviously
-    printf("You transferred %f bytes of data in %f seconds\n",bytes_transferred,time_spent);
-    printf("Measured Transfer throughput = %f Mbytes/sec\n",throughput);
+    // unsigned int bytes_transferred = 0; // change obviously
+    // float time_spent = 1; // change obviously
+
+    // Calculate total bytes transferred //
+    unsigned int bytes_transferred = 2048U * sizeof(unsigned int);
+
+    // Convert elapsed clock cycles into seconds //
+    float time_spent = (float)(stop_time - start_time) / 125000000.0f;
+
+    // Calculate throughput in Mbytes per second //
+    float throughput = 0.0f;
+
+    if (time_spent > 0.0f)
+    {
+        throughput = (float)bytes_transferred / (time_spent * 1000000.0f);
+    }
+
+    // Professor's original output statements //
+    // printf("You transferred %f bytes of data in %f seconds\n",bytes_transferred,time_spent);
+    // printf("Measured Transfer throughput = %f Mbytes/sec\n",throughput);
+
+    // Display calculated benchmark results //
+    printf("You transferred %u bytes of data in %f seconds\n",
+           bytes_transferred, time_spent);
+
+    printf("Measured Transfer throughput = %f Mbytes/sec\n",
+           throughput);
 }
 
 int main()
@@ -73,7 +118,21 @@ int main()
 // first, get a pointer to the peripheral base address using /dev/mem and the function mmap
     volatile unsigned int *my_periph = get_a_pointer(RADIO_PERIPH_ADDRESS);	
 
-    printf("\r\n\r\n\r\nLab 6 YOURNAME - Custom Peripheral Demonstration\n\r");
+/*//////////////////////////////////////////////////////////////
+  Lab 10 Modification: Student Identification
+  Purpose: Display the student name and course information
+           when the Linux test program starts.
+//////////////////////////////////////////////////////////////*/
+
+// Professor's original startup message //
+// printf("\r\n\r\n\r\nLab 6 YOURNAME - Custom Peripheral Demonstration\n\r"); //
+
+    printf("\r\n\r\n\r\nJohns Hopkins University\n");
+    printf("EN.525.742 - System-on-a-Chip\n");
+    printf("Lab 10 - Custom Radio Peripheral\n");
+    printf("Student: Evaristo Rangel\n\r");
+
+    // Professor's original radio test sequence //
     *(my_periph+RADIO_TUNER_CONTROL_REG_OFFSET) = 0; // make sure radio isn't in reset
     printf("Tuning Radio to 30MHz\n\r");
     radioTuner_tuneRadio(my_periph,30e6);

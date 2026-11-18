@@ -746,12 +746,81 @@
       <spirit:file>
         <spirit:name>src/dds_compiler_0/dds_compiler_0.xci</spirit:name>
         <spirit:userFileType>xci</spirit:userFileType>
-        <spirit:userFileType>CELL_NAME_full_radio_v1_0_S00_AXI_inst/your_instance_name</spirit:userFileType>
-      </spirit:file>
+          <!-- Original professor DDS instance reference -->
+  	  <!-- <spirit:userFileType>CELL_NAME_full_radio_v1_0_S00_AXI_inst/your_instance_name</spirit:userFileType> -->
+
+  	  <!-- Lab 10 Modification: DDS moved into radio_dsp -->
+  	  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fake_adc_dds_inst</spirit:userFileType>
+	  </spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: Tuner DDS Registration
+    Purpose: Include the tuner DDS in synthesis.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>src/tuner_dds/tuner_dds.xci</spirit:name>
+  <spirit:userFileType>xci</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/tuner_dds_inst</spirit:userFileType>
+</spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: FIR Filter 1 Synthesis Registration
+    Purpose: Include the first-stage decimation filter for
+             both in-phase (I) and quadrature (Q) channels.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>src/fir_filter1/fir_filter1.xci</spirit:name>
+  <spirit:userFileType>xci</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fir1_i_inst</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fir1_q_inst</spirit:userFileType>
+</spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: FIR Filter 2 Synthesis Registration
+    Purpose: Include the second-stage decimation filter for
+             both in-phase (I) and quadrature (Q) channels.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>src/fir_filter2/fir_filter2.xci</spirit:name>
+  <spirit:userFileType>xci</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fir2_i_inst</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fir2_q_inst</spirit:userFileType>
+</spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: FIR Coefficient File Registration
+    Purpose: Package both FIR coefficient files with the
+             custom radio IP for synthesis.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>src/fir_filter1/fir1.coe</spirit:name>
+  <spirit:userFileType>coe</spirit:userFileType>
+</spirit:file>
+
+<spirit:file>
+  <spirit:name>src/fir_filter2/fir2.coe</spirit:name>
+  <spirit:userFileType>coe</spirit:userFileType>
+</spirit:file>
+
       <spirit:file>
         <spirit:name>hdl/full_radio_v1_0_S00_AXI.vhd</spirit:name>
         <spirit:fileType>vhdlSource</spirit:fileType>
       </spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: Radio DSP Source Registration
+    Purpose: Include the new radio_dsp module in synthesis.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>hdl/radio_dsp.vhd</spirit:name>
+  <spirit:fileType>vhdlSource</spirit:fileType>
+</spirit:file>
+
       <spirit:file>
         <spirit:name>hdl/full_radio_v1_0.vhd</spirit:name>
         <spirit:fileType>vhdlSource</spirit:fileType>
@@ -773,12 +842,82 @@
       <spirit:file>
         <spirit:name>src/dds_compiler_0/dds_compiler_0.xci</spirit:name>
         <spirit:userFileType>xci</spirit:userFileType>
-        <spirit:userFileType>CELL_NAME_full_radio_v1_0_S00_AXI_inst/your_instance_name</spirit:userFileType>
+
+  <!-- Original professor DDS instance reference -->
+  <!-- <spirit:userFileType>CELL_NAME_full_radio_v1_0_S00_AXI_inst/your_instance_name</spirit:userFileType> -->
+
+  <!-- Lab 10 Modification: DDS moved into radio_dsp -->
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fake_adc_dds_inst</spirit:userFileType>
       </spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: Tuner DDS Simulation Registration
+    Purpose: Include the tuner DDS in behavioral simulation.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>src/tuner_dds/tuner_dds.xci</spirit:name>
+  <spirit:userFileType>xci</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/tuner_dds_inst</spirit:userFileType>
+</spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: FIR Filter 1 Simulation Registration
+    Purpose: Include the first-stage decimation filter for
+             both in-phase (I) and quadrature (Q) channels.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>src/fir_filter1/fir_filter1.xci</spirit:name>
+  <spirit:userFileType>xci</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fir1_i_inst</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fir1_q_inst</spirit:userFileType>
+</spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: FIR Filter 2 Simulation Registration
+    Purpose: Include the second-stage decimation filter for
+             both in-phase (I) and quadrature (Q) channels.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>src/fir_filter2/fir_filter2.xci</spirit:name>
+  <spirit:userFileType>xci</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fir2_i_inst</spirit:userFileType>
+  <spirit:userFileType>CELL_NAME_radio_dsp_inst/fir2_q_inst</spirit:userFileType>
+</spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: FIR Coefficient Simulation Registration
+    Purpose: Include both FIR coefficient files in the
+             behavioral simulation file set.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>src/fir_filter1/fir1.coe</spirit:name>
+  <spirit:userFileType>coe</spirit:userFileType>
+</spirit:file>
+
+<spirit:file>
+  <spirit:name>src/fir_filter2/fir2.coe</spirit:name>
+  <spirit:userFileType>coe</spirit:userFileType>
+</spirit:file>
+
       <spirit:file>
         <spirit:name>hdl/full_radio_v1_0_S00_AXI.vhd</spirit:name>
         <spirit:fileType>vhdlSource</spirit:fileType>
       </spirit:file>
+
+<!--//////////////////////////////////////////////////////////////
+    Lab 10 Modification: Radio DSP Source Registration
+    Purpose: Include radio_dsp.vhd in behavioral simulation.
+//////////////////////////////////////////////////////////////-->
+
+<spirit:file>
+  <spirit:name>hdl/radio_dsp.vhd</spirit:name>
+  <spirit:fileType>vhdlSource</spirit:fileType>
+</spirit:file>
+
       <spirit:file>
         <spirit:name>hdl/full_radio_v1_0.vhd</spirit:name>
         <spirit:fileType>vhdlSource</spirit:fileType>

@@ -58,6 +58,18 @@ architecture arch_imp of full_radio_v1_0 is
 		port (
 		m_axis_tvalid : out std_logic;
 		m_axis_tdata : out std_logic_Vector(31 downto 0);
+
+   		 --//////////////////////////////////////////////////////////////
+		 -- Lab 10 Modification: Radio DSP Control Ports
+    		 -- Purpose: Declare the AXI-Lite control outputs used
+   		 --          	     the radio processing module.
+   		 --//////////////////////////////////////////////////////////////
+
+    		 fake_adc_phase_inc : out std_logic_vector(31 downto 0);
+		 tuner_phase_inc    : out std_logic_vector(31 downto 0);
+		 dds_resetn_out     : out std_logic;
+		 tuner_config_valid : out std_logic;
+
 		S_AXI_ACLK	: in std_logic;
 		S_AXI_ARESETN	: in std_logic;
 		S_AXI_AWADDR	: in std_logic_vector(C_S_AXI_ADDR_WIDTH-1 downto 0);
@@ -82,8 +94,81 @@ architecture arch_imp of full_radio_v1_0 is
 		);
 	end component full_radio_v1_0_S00_AXI;
 
+    --//////////////////////////////////////////////////////////////
+    -- Lab 10 Modification: Radio DSP Component Declaration
+    -- Purpose: Declare the complete digital downconverter
+    --          	containing the fake ADC DDS, tuner DDS,
+    --          	complex mixer, FIR filters, and stereo output.
+    --//////////////////////////////////////////////////////////////
+
+    component radio_dsp is
+        port (
+            clk125             : in  std_logic;
+            resetn             : in  std_logic;
+
+            fake_adc_phase_inc : in  std_logic_vector(31 downto 0);
+            tuner_phase_inc    : in  std_logic_vector(31 downto 0);
+
+            dds_resetn         : in  std_logic;
+            tuner_config_valid : in  std_logic;
+
+            m_axis_tdata       : out std_logic_vector(31 downto 0);
+            m_axis_tvalid      : out std_logic
+        );
+    end component;
+
+		--//////////////////////////////////////////////////////////////
+		-- Lab 10 Modification: Radio DSP Control Signals
+		-- Purpose: Carry the AXI-Lite register values and tuner
+		--                 configuration pulse to the radio DSP module.
+		--//////////////////////////////////////////////////////////////
+
+		signal radio_fake_adc_phase_inc : std_logic_vector(31 downto 0);
+		signal radio_tuner_phase_inc    : std_logic_vector(31 downto 0);
+		signal radio_dds_resetn         : std_logic;
+		signal radio_tuner_config_valid : std_logic;
+
+    --//////////////////////////////////////////////////////////////
+    -- Lab 10 Modification: Radio DSP Audio Output Signals
+    -- Purpose: Carry the completed stereo audio stream from
+    --          the DSP module to the peripheral interface.
+    --//////////////////////////////////////////////////////////////
+
+    signal radio_audio_tdata  : std_logic_vector(31 downto 0);
+    signal radio_audio_tvalid : std_logic;
 
 begin
+
+    --//////////////////////////////////////////////////////////////
+    -- Lab 10 Modification: DSP AXI-Stream Output Connections
+    -- Purpose: Route the completed stereo audio stream from
+    --          the radio DSP module to the peripheral outputs.
+    --//////////////////////////////////////////////////////////////
+
+    m_axis_tdata  <= radio_audio_tdata;
+    m_axis_tvalid <= radio_audio_tvalid;
+
+    --//////////////////////////////////////////////////////////////
+    -- Lab 10 Modification: Radio DSP Instantiation
+    -- Purpose: Connect the AXI-Lite control registers to
+    --          the complete digital downconverter and capture
+    --          its stereo AXI-Stream audio outputs.
+    --//////////////////////////////////////////////////////////////
+
+    radio_dsp_inst : radio_dsp
+        port map (
+            clk125             => s00_axi_aclk,
+            resetn             => s00_axi_aresetn,
+
+            fake_adc_phase_inc => radio_fake_adc_phase_inc,
+            tuner_phase_inc    => radio_tuner_phase_inc,
+
+            dds_resetn         => radio_dds_resetn,
+            tuner_config_valid => radio_tuner_config_valid,
+
+            m_axis_tdata       => radio_audio_tdata,
+            m_axis_tvalid      => radio_audio_tvalid
+        );
 
 -- Instantiation of Axi Bus Interface S00_AXI
 full_radio_v1_0_S00_AXI_inst : full_radio_v1_0_S00_AXI
@@ -92,8 +177,30 @@ full_radio_v1_0_S00_AXI_inst : full_radio_v1_0_S00_AXI
 		C_S_AXI_ADDR_WIDTH	=> C_S00_AXI_ADDR_WIDTH
 	)
 	port map (
-	    m_axis_tdata => m_axis_tdata,
-        m_axis_tvalid => m_axis_tvalid,
+    		--//////////////////////////////////////////////////////////////
+    		-- Lab 10 Modification: Disconnect Original DDS Audio Stream
+    		-- Purpose: Release the top-level AXI-Stream outputs so
+    		--          the radio DSP module can drive stereo audio.
+    		--//////////////////////////////////////////////////////////////
+
+    		-- Original professor connections:
+    		-- m_axis_tdata  => m_axis_tdata,
+    		-- m_axis_tvalid => m_axis_tvalid,
+
+    		m_axis_tdata  => open,
+    		m_axis_tvalid => open,
+
+   		 --//////////////////////////////////////////////////////////////
+   		 -- Lab 10 Modification: Radio DSP Control Connections
+   		 -- Purpose: Route the AXI-Lite register outputs and tuner
+   		 --          configuration pulse to the top-level signals.
+		 --//////////////////////////////////////////////////////////////
+
+   		 fake_adc_phase_inc => radio_fake_adc_phase_inc,
+   		 tuner_phase_inc    => radio_tuner_phase_inc,
+   		 dds_resetn_out     => radio_dds_resetn,
+		 tuner_config_valid => radio_tuner_config_valid,
+
 		S_AXI_ACLK	=> s00_axi_aclk,
 		S_AXI_ARESETN	=> s00_axi_aresetn,
 		S_AXI_AWADDR	=> s00_axi_awaddr,

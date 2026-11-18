@@ -18,6 +18,18 @@ entity full_radio_v1_0_S00_AXI is
 		-- Users to add ports here
         m_axis_tdata : out std_logic_vector(31 downto 0);
         m_axis_tvalid : out std_logic;
+
+        --//////////////////////////////////////////////////////////////
+        -- Lab 10 Modification: Radio DSP Control Outputs
+        -- Purpose: Expose the AXI-Lite register values and tuner
+        --        	   configuration pulse to the radio DSP module.
+        --//////////////////////////////////////////////////////////////
+
+        fake_adc_phase_inc : out std_logic_vector(31 downto 0);
+        tuner_phase_inc    : out std_logic_vector(31 downto 0);
+        dds_resetn_out     : out std_logic;
+        tuner_config_valid : out std_logic;
+
 		-- User ports ends
 		-- Do not modify the ports beyond this line
 
@@ -122,21 +134,38 @@ architecture arch_imp of full_radio_v1_0_S00_AXI is
 	--//////////////////////////////////////////////////////////////
 	-- Lab 10 Modification: DDS Reset Control
 	-- Purpose: Provide an active-low DDS reset signal controlled
-	--          by bit 0 of AXI-Lite Register 2.
+	--        	   by bit 0 of AXI-Lite Register 2.
 	--//////////////////////////////////////////////////////////////
 
 	signal dds_aresetn : std_logic;
 
-COMPONENT dds_compiler_0
-  PORT (
-    aclk : IN STD_LOGIC;
-    aresetn : IN STD_LOGIC;
-    s_axis_phase_tvalid : IN STD_LOGIC;
-    s_axis_phase_tdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
-    m_axis_data_tvalid : OUT STD_LOGIC;
-    m_axis_data_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
-  );
-    END COMPONENT;
+	--//////////////////////////////////////////////////////////////
+	-- Lab 10 Modification: Tuner DDS Configuration Pulse
+	-- Purpose: Generate a one-clock-cycle pulse when software
+	--        	   updates the tuner phase increment in Register 1.
+	--//////////////////////////////////////////////////////////////
+
+	signal tuner_update_pulse : std_logic;
+
+--//////////////////////////////////////////////////////////////
+-- Lab 10 Modification: Original DDS Component Relocation
+-- Purpose: Disable the obsolete DDS component declaration.
+--          The DDS is now instantiated within radio_dsp.
+--          Preserve the original declaration for reference.
+--//////////////////////////////////////////////////////////////
+
+-- Original professor-provided DDS component:
+
+--COMPONENT dds_compiler_0
+--  PORT (
+--    aclk : IN STD_LOGIC;
+--    aresetn : IN STD_LOGIC;
+--    s_axis_phase_tvalid : IN STD_LOGIC;
+--    s_axis_phase_tdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+--    m_axis_data_tvalid : OUT STD_LOGIC;
+--    m_axis_data_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
+--  );
+--    END COMPONENT;
 
 begin
 	-- I/O Connections assignments
@@ -144,10 +173,21 @@ begin
 	--//////////////////////////////////////////////////////////////
 	-- Lab 10 Modification: DDS Reset Control Logic
 	-- Purpose: Allow bit 0 of AXI-Lite Register 2 to reset the
-	--          DDS while preserving the system's active-low reset.
+	--         	   DDS while preserving the system's active-low reset.
 	--//////////////////////////////////////////////////////////////
 
 	dds_aresetn <= S_AXI_ARESETN and not slv_reg2(0);
+
+	--//////////////////////////////////////////////////////////////
+	-- Lab 10 Modification: Radio DSP Control Signal Connections
+	-- Purpose: Connect the AXI-Lite registers and tuner update
+	--          	   pulse to the radio DSP control output ports.
+	--//////////////////////////////////////////////////////////////
+
+	fake_adc_phase_inc <= slv_reg0;
+	tuner_phase_inc    <= slv_reg1;
+	dds_resetn_out     <= dds_aresetn;
+	tuner_config_valid <= tuner_update_pulse;
 
 	S_AXI_AWREADY	<= axi_awready;
 	S_AXI_WREADY	<= axi_wready;
@@ -245,17 +285,22 @@ begin
 	      slv_reg0 <= (others => '0');
 	      slv_reg1 <= (others => '0');
 	      slv_reg2 <= (others => '0');
+	      tuner_update_pulse <= '0';
 
 	    --//////////////////////////////////////////////////////////////
 	    -- Lab 10 Modification: Register 3 - Timer Reset
 	    -- Purpose: Remove Register 3 from the original reset logic.
-	    --          The dedicated timer process will handle its reset.
+	    --         		The dedicated timer process will handle its reset.
 	    --//////////////////////////////////////////////////////////////
 
     	    -- Original professor-provided implementation:
 	    -- slv_reg3 <= (others => '0');
 
 	    else
+	      
+	      -- Default low; assert only when Register 1 is updated.
+	      tuner_update_pulse <= '0';
+
 	      loc_addr := axi_awaddr(ADDR_LSB + OPT_MEM_ADDR_BITS downto ADDR_LSB);
 	      if (slv_reg_wren = '1') then
 	        case loc_addr is
@@ -275,6 +320,17 @@ begin
 	                slv_reg1(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
 	              end if;
 	            end loop;
+
+	--//////////////////////////////////////////////////////////////
+	-- Lab 10 Modification: Tuner DDS Configuration Update
+	-- Purpose: Assert a one-clock-cycle configuration pulse
+	--         	   when Register 1 receives a valid byte write.
+	--//////////////////////////////////////////////////////////////
+
+	if unsigned(S_AXI_WSTRB) /= 0 then
+	    tuner_update_pulse <= '1';
+		end if;
+
 	          when b"10" =>
 	            for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
 	              if ( S_AXI_WSTRB(byte_index) = '1' ) then
@@ -283,12 +339,13 @@ begin
 	                slv_reg2(byte_index*8+7 downto byte_index*8) <= S_AXI_WDATA(byte_index*8+7 downto byte_index*8);
 	              end if;
 	            end loop;
+
 	         when b"11" =>
-		    --//////////////////////////////////////////////////////////////
-		    -- Lab 10 Modification: Register 3 - Read-Only Timer
-		    -- Purpose: Disable AXI-Lite writes to Register 3 so it can
-		    --          operate as a free-running 32-bit timer.
-		    --//////////////////////////////////////////////////////////////
+		  --//////////////////////////////////////////////////////////////
+		  -- Lab 10 Modification: Register 3 - Read-Only Timer
+		  -- Purpose: Disable AXI-Lite writes to Register 3 so it can
+		  --          	     operate as a free-running 32-bit timer.
+		  --//////////////////////////////////////////////////////////////
 		
 	          --  for byte_index in 0 to (C_S_AXI_DATA_WIDTH/8-1) loop
 	          --    if ( S_AXI_WSTRB(byte_index) = '1' ) then
@@ -317,8 +374,8 @@ begin
 --//////////////////////////////////////////////////////////////
 -- Lab 10 Modification: Register 3 - Free-Running Timer
 -- Purpose: Implement a 32-bit counter that increments on
---          every AXI clock cycle and resets to zero when
---          the AXI active-low reset is asserted.
+--          	   every AXI clock cycle and resets to zero when
+--          	   the AXI active-low reset is asserted.
 --//////////////////////////////////////////////////////////////
 
 process (S_AXI_ACLK)
@@ -432,7 +489,7 @@ end process;
 		    --//////////////////////////////////////////////////////////////
 		    -- Lab 10 Modification: Tuner DDS Phase Increment Readback
 		    -- Purpose: Return the value stored in Register 1 instead
-		    --          of the original DEADBEEF placeholder.
+		    --          	of the original DEADBEEF placeholder.
    		    --//////////////////////////////////////////////////////////////
 		-- Original professor-provided implementation:
 	        -- reg_data_out <= x"DEADBEEF"; ...lol deadbeef...
@@ -469,26 +526,41 @@ end process;
 
 	-- Add user logic here
 
---//////////////////////////////////////////////////////////////
--- Lab 10 Modification: DDS Compiler Reset Integration
--- Purpose: Replace the hardwired reset with the AXI-Lite
---          software-controlled reset signal from Register 2.
---//////////////////////////////////////////////////////////////
+    --//////////////////////////////////////////////////////////////
+    -- Lab 10 Modification: Original DDS Instance Relocation
+    -- Purpose: Disable the original DDS instance because DDS
+    --          	waveform generation is now handled by radio_dsp.
+    --          	Preserve the previous implementation for reference.
+    --//////////////////////////////////////////////////////////////
 
-your_instance_name : dds_compiler_0
-  PORT MAP (
-    aclk => s_axi_aclk,
+    -- Original DDS instance with Lab 10 reset modification:
+    --
+    -- your_instance_name : dds_compiler_0
+    --   PORT MAP (
+    --     aclk => s_axi_aclk,
+    --
+    --     Original professor-provided reset:
+    --     aresetn => '1',
+    --
+    --     Lab 10 software-controlled reset:
+    --     aresetn => dds_aresetn,
+    --
+    --     s_axis_phase_tvalid => '1',
+    --     s_axis_phase_tdata => slv_reg0,
+    --     m_axis_data_tvalid => m_axis_tvalid,
+    --     m_axis_data_tdata => m_axis_tdata
+    --   );
 
-    -- Original professor-provided implementation:
-    -- aresetn => '1',
-    -- Connect DDS reset to Register 2 control logic.
-    aresetn => dds_aresetn,
-    
-    s_axis_phase_tvalid => '1',
-    s_axis_phase_tdata => slv_reg0,
-    m_axis_data_tvalid => m_axis_tvalid,
-    m_axis_data_tdata => m_axis_tdata
-  );
+
+    --//////////////////////////////////////////////////////////////
+    -- Lab 10 Modification: Unused AXI-Lite Audio Outputs
+    -- Purpose: Drive the unused AXI-Lite audio output ports
+    --          	to zero. The radio_dsp module now generates
+    --          	the peripheral's stereo AXI-Stream output.
+    --//////////////////////////////////////////////////////////////
+
+    m_axis_tdata  <= (others => '0');
+    m_axis_tvalid <= '0';
 
 
 	-- User logic ends
